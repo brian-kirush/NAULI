@@ -1,0 +1,36 @@
+name: nauli_tap
+description: NFC Transit App for POS Systems
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  
+  # Core dependencies
+  http: ^1.1.0
+  geolocator: ^11.0.1
+  shared_preferences: ^2.2.2
+  
+  # UI enhancements
+  flutter_spinkit: ^5.2.0
+  intl: ^0.18.1
+  
+  # NFC functionality
+  flutter_nfc_kit: ^3.6.0
+  supabase_flutter: ^2.10.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

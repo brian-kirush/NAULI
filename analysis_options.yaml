@@ -1,0 +1,7 @@
+analyzer:
+  errors:
+    prefer_const_constructors: ignore
+    prefer_const_literals_to_create_immutables: ignore
+    prefer_expression_function_bodies: ignore
+    omit_local_variable_types: ignore
+    unawaited_futures: ignore
