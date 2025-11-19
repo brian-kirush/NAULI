@@ -988,7 +988,7 @@ class _FareCollectionScreenState extends State<FareCollectionScreen> {
                 const SizedBox(height: 8),
                 if (serverMessage != null)
                   Text(
-                    serverMessage!,
+                    serverMessage,
                     style: const TextStyle(
                       fontSize: 12,
                       color: Colors.green,
