@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'services/nfc_service.dart';
 import 'services/transaction_service.dart';
+import 'services/http_api_service.dart';
 
 class FareCollectionScreen extends StatefulWidget {
   final String route;
   final int fare;
   final int passengerCapacity;
   final String conductorId;
+  final String? tripId;
 
   const FareCollectionScreen({
     super.key,
@@ -14,6 +16,7 @@ class FareCollectionScreen extends StatefulWidget {
     required this.fare,
     required this.passengerCapacity,
     required this.conductorId,
+    this.tripId,
   });
 
   @override
@@ -920,19 +923,50 @@ class _FareCollectionScreenState extends State<FareCollectionScreen> {
     );
   }
 
-  void _showTripSummary(BuildContext context) {
+  Future<void> _showTripSummary(BuildContext context) async {
     final platformFee = _passengersPaid * 2;
     final netAmount = _collectedAmount - platformFee;
 
     print('📊 Showing trip summary');
-    print('💰 Total Collected: Ksh $_collectedAmount');
-    print('👥 Passengers Paid: $_passengersPaid');
-    print('💸 Platform Fee: Ksh $platformFee');
-    print('📈 Net Amount: Ksh $netAmount');
+    print('💰 Total Collected (local): Ksh $_collectedAmount');
+    print('👥 Passengers Paid (local): $_passengersPaid');
+    print('💸 Platform Fee (local): Ksh $platformFee');
+    print('📈 Net Amount (local): Ksh $netAmount');
+
+    Map<String, dynamic>? tripFromServer;
+    String? serverMessage;
+
+    if (widget.tripId != null && widget.tripId!.isNotEmpty) {
+      print('🌐 Ending trip on server with id: ${widget.tripId}');
+      final endResult = await HttpApiService.endTrip(tripId: widget.tripId!);
+      if (endResult['success'] == true) {
+        tripFromServer = endResult['trip'] as Map<String, dynamic>?;
+        serverMessage = endResult['message']?.toString();
+        print('✅ Trip ended on server: ${tripFromServer?['_id']}');
+      } else {
+        final errMsg = endResult['message']?.toString() ??
+            'Failed to sync trip summary with server.';
+        print('⚠️ Failed to end trip on server: $errMsg');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errMsg),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } else {
+      print('⚠️ No tripId provided; showing local summary only.');
+    }
+
+    final backendTotal = tripFromServer?['total_collections'] as num?;
+    final backendPassengers = tripFromServer?['total_passengers'] as num?;
+    final backendPlatformFees = tripFromServer?['total_platform_fees'] as num?;
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -951,25 +985,60 @@ class _FareCollectionScreenState extends State<FareCollectionScreen> {
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
+                if (serverMessage != null)
+                  Text(
+                    serverMessage!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.green,
+                    ),
+                  ),
+                const SizedBox(height: 12),
                 _buildSummaryRow('Route', widget.route),
                 _buildSummaryRow('Fare per Passenger', 'Ksh ${widget.fare}'),
-                _buildSummaryRow('Passengers Paid',
-                    '$_passengersPaid/${widget.passengerCapacity}'),
-                _buildSummaryRow('Total Collected', 'Ksh $_collectedAmount'),
                 _buildSummaryRow(
-                    'Platform Fee (Ksh 2/pax)', 'Ksh $platformFee'),
+                  'Passengers Paid (device)',
+                  '$_passengersPaid/${widget.passengerCapacity}',
+                ),
+                if (backendPassengers != null)
+                  _buildSummaryRow(
+                    'Passengers (backend)',
+                    backendPassengers.toInt().toString(),
+                  ),
+                _buildSummaryRow(
+                  'Total Collected (device)',
+                  'Ksh $_collectedAmount',
+                ),
+                if (backendTotal != null)
+                  _buildSummaryRow(
+                    'Total Collected (backend)',
+                    'Ksh ${backendTotal.toDouble().toStringAsFixed(2)}',
+                  ),
+                _buildSummaryRow(
+                  'Platform Fee (Ksh 2/pax)',
+                  'Ksh $platformFee',
+                ),
+                if (backendPlatformFees != null)
+                  _buildSummaryRow(
+                    'Platform Fee (backend)',
+                    'Ksh ${backendPlatformFees.toDouble().toStringAsFixed(2)}',
+                  ),
                 const Divider(),
-                _buildSummaryRow('Net Amount', 'Ksh $netAmount', isTotal: true),
+                _buildSummaryRow(
+                  'Net Amount (device)',
+                  'Ksh $netAmount',
+                  isTotal: true,
+                ),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      print('🏁 Trip ended successfully');
-                      Navigator.pop(context);
-                      Navigator.pop(context);
+                      print('🏁 Trip end confirmed by conductor');
+                      Navigator.pop(dialogContext);
+                      Navigator.pop(dialogContext);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue[700],

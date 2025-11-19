@@ -8,6 +8,138 @@ import 'package:shared_preferences/shared_preferences.dart';
 class HttpApiService {
   static const String _baseUrl = 'https://naulitap-api.onrender.com';
 
+  /// Helper to build authenticated headers using the stored JWT.
+  static Future<Map<String, String>> _authHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    if (token == null || token.isEmpty) {
+      throw StateError('Missing auth token. Please log in again.');
+    }
+
+    return <String, String>{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  /// Starts a new trip for the logged-in conductor.
+  ///
+  /// Calls POST /trip/start with:
+  /// {
+  ///   "route_name": string,
+  ///   "fare_amount": number,
+  ///   "passenger_capacity": number
+  /// }
+  ///
+  /// Returns a map with success flag, message, and trip details when
+  /// successful. On failure, returns { success: false, message, error }.
+  static Future<Map<String, dynamic>> startTrip({
+    required String routeName,
+    required double fareAmount,
+    required int passengerCapacity,
+  }) async {
+    try {
+      final headers = await _authHeaders();
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/trip/start'),
+        headers: headers,
+        body: jsonEncode(<String, dynamic>{
+          'route_name': routeName,
+          'fare_amount': fareAmount,
+          'passenger_capacity': passengerCapacity,
+        }),
+      );
+
+      Map<String, dynamic> body = <String, dynamic>{};
+      try {
+        if (response.body.isNotEmpty) {
+          body = jsonDecode(response.body) as Map<String, dynamic>;
+        }
+      } catch (_) {
+        // keep empty body on parse failure
+      }
+
+      if (response.statusCode == 201 && body['success'] == true) {
+        return <String, dynamic>{
+          'success': true,
+          'trip': body['trip'],
+          'message': body['message'] ?? 'Trip started successfully.',
+        };
+      }
+
+      return <String, dynamic>{
+        'success': false,
+        'error': 'TRIP_START_FAILED',
+        'statusCode': response.statusCode,
+        'message': body['message']?.toString() ??
+            'Failed to start trip. Please try again.',
+      };
+    } catch (e) {
+      // ignore: avoid_print
+      print('💥 startTrip error: $e');
+      return <String, dynamic>{
+        'success': false,
+        'error': 'NETWORK_ERROR',
+        'message': 'Unable to start trip. Check your connection and try again.',
+      };
+    }
+  }
+
+  /// Ends the active trip for the logged-in conductor.
+  ///
+  /// Calls POST /trip/end with { "trip_id": string } and returns the
+  /// updated trip summary from the backend.
+  static Future<Map<String, dynamic>> endTrip({
+    required String tripId,
+  }) async {
+    try {
+      final headers = await _authHeaders();
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/trip/end'),
+        headers: headers,
+        body: jsonEncode(<String, dynamic>{
+          'trip_id': tripId,
+        }),
+      );
+
+      Map<String, dynamic> body = <String, dynamic>{};
+      try {
+        if (response.body.isNotEmpty) {
+          body = jsonDecode(response.body) as Map<String, dynamic>;
+        }
+      } catch (_) {
+        // keep empty body on parse failure
+      }
+
+      if (response.statusCode == 200 && body['success'] == true) {
+        return <String, dynamic>{
+          'success': true,
+          'trip': body['trip'],
+          'message': body['message'] ?? 'Trip ended successfully.',
+        };
+      }
+
+      return <String, dynamic>{
+        'success': false,
+        'error': 'TRIP_END_FAILED',
+        'statusCode': response.statusCode,
+        'message': body['message']?.toString() ??
+            'Failed to end trip. Please try again.',
+      };
+    } catch (e) {
+      // ignore: avoid_print
+      print('💥 endTrip error: $e');
+      return <String, dynamic>{
+        'success': false,
+        'error': 'NETWORK_ERROR',
+        'message': 'Unable to end trip. Check your connection and try again.',
+      };
+    }
+  }
+
   /// Checks the balance of an NFC card via the Nauli Tap API.
   ///
   /// This currently calls the **customer** balance endpoint:
@@ -21,6 +153,7 @@ class HttpApiService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
+      final normalizedUid = cardUid.trim().toUpperCase();
 
       if (token == null) {
         return <String, dynamic>{
@@ -30,7 +163,7 @@ class HttpApiService {
         };
       }
 
-      final uri = Uri.parse('$_baseUrl/payment/balance/$cardUid');
+      final uri = Uri.parse('$_baseUrl/payment/balance/$normalizedUid');
       final response = await http.get(
         uri,
         headers: <String, String>{
@@ -205,11 +338,12 @@ class HttpApiService {
       };
 
       // STEP 1: Initiate fare deduction
+      final normalizedUid = cardUid.trim().toUpperCase();
       final initResp = await http.post(
         Uri.parse('$_baseUrl/payment/fare/deduct/initiate'),
         headers: headers,
         body: jsonEncode(<String, dynamic>{
-          'nfc_uid': cardUid,
+          'nfc_uid': normalizedUid,
           'fare_amount': fareAmount,
         }),
       );

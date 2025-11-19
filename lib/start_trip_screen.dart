@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'fare_collection_screen.dart';
 import 'services/conductor_service.dart';
+import 'services/http_api_service.dart';
 
 class StartTripScreen extends StatefulWidget {
   const StartTripScreen({super.key});
@@ -410,7 +411,7 @@ class _StartTripScreenState extends State<StartTripScreen> {
                 child: ElevatedButton(
                   onPressed: _selectedRoute != null
                       ? () {
-                          _startTrip(context);
+                          _handleStartTrip(context);
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -571,7 +572,7 @@ class _StartTripScreenState extends State<StartTripScreen> {
     );
   }
 
-  void _startTrip(BuildContext context) {
+  Future<void> _handleStartTrip(BuildContext context) async {
     final conductor = ConductorService.currentConductor;
     if (conductor == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -583,7 +584,57 @@ class _StartTripScreenState extends State<StartTripScreen> {
       return;
     }
 
+    if (_selectedRoute == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a route to start the trip'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Call backend /trip/start so that the trip is persisted server-side.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Starting trip...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
+    final startResult = await HttpApiService.startTrip(
+      routeName: _selectedRoute!,
+      fareAmount: _selectedFare.toDouble(),
+      passengerCapacity: _passengerCapacity,
+    );
+
+    if (startResult['success'] != true) {
+      final message = startResult['message']?.toString() ??
+          'Failed to start trip. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final dynamic trip = startResult['trip'];
+    final String tripId =
+        trip is Map<String, dynamic> ? (trip['id']?.toString() ?? '') : '';
+
+    if (tripId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Trip started but missing trip ID from server.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+
     // Navigate to fare collection screen with trip details
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -592,6 +643,7 @@ class _StartTripScreenState extends State<StartTripScreen> {
           fare: _selectedFare,
           passengerCapacity: _passengerCapacity,
           conductorId: conductor.id,
+          tripId: tripId,
         ),
       ),
     );
