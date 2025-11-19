@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/nfc_service.dart';
 import 'services/transaction_service.dart';
-import 'services/api_service.dart'; // Keep this for balance checking
 
 class FareCollectionScreen extends StatefulWidget {
   final String route;
@@ -363,7 +362,7 @@ class _FareCollectionScreenState extends State<FareCollectionScreen> {
             const SizedBox(height: 8),
             Text(message),
           ],
-        ),
+      ),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
@@ -371,115 +370,61 @@ class _FareCollectionScreenState extends State<FareCollectionScreen> {
             ? SnackBarAction(
                 label: 'View Balance',
                 textColor: Colors.white,
-                onPressed: () => _showCardBalance(cardUid),
+                onPressed: () => _showCardBalance(cardUid, newBalance),
               )
             : null,
       ),
     );
   }
 
-  void _showCardBalance(String cardUid) {
+  void _showCardBalance(String cardUid, double? balance) {
     print('💰 Showing card balance for: $cardUid');
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final displayBalance = balance;
         return AlertDialog(
           title: const Text('Card Balance'),
-          content: FutureBuilder<Map<String, dynamic>>(
-            future: ApiService.checkCardBalance(cardUid),
-            builder: (context, snapshot) {
-              print('🔍 Checking card balance...');
-              print('📊 Snapshot state: ${snapshot.connectionState}');
-              print('❌ Snapshot error: ${snapshot.error}');
-              print('📦 Snapshot data: ${snapshot.data}');
-
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                print('⏳ Loading balance...');
-                return const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Card: •••• ${cardUid.substring(cardUid.length - 4)}'),
+              const SizedBox(height: 12),
+              if (displayBalance != null)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('Checking balance...'),
+                      const Text(
+                        'Balance:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Ksh ${displayBalance.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
                     ],
                   ),
-                );
-              }
-
-              if (snapshot.hasError) {
-                print('💥 Balance check error: ${snapshot.error}');
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error, color: Colors.red, size: 40),
-                    const SizedBox(height: 16),
-                    Text('Error: ${snapshot.error}'),
-                  ],
-                );
-              }
-
-              if (!snapshot.hasData || !snapshot.data!['isRegistered']) {
-                print('❌ Card not registered or no data');
-                return const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.credit_card_off, color: Colors.orange, size: 40),
-                    SizedBox(height: 16),
-                    Text('Card not registered'),
-                  ],
-                );
-              }
-
-              final balance = snapshot.data!['balance'] ?? 0.0;
-              final cardHolder = snapshot.data!['cardHolder'] ?? 'Unknown';
-
-              print('✅ Balance loaded: Ksh $balance');
-              print('👤 Card Holder: $cardHolder');
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Card: •••• ${cardUid.substring(cardUid.length - 4)}'),
-                  const SizedBox(height: 8),
-                  Text('Holder: $cardHolder'),
-                  const SizedBox(height: 8),
-                  const Text('Status: ✅ Registered',
-                      style: TextStyle(
-                          color: Colors.green, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Balance:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Ksh ${balance.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
+                )
+              else
+                const Text(
+                  'Balance will be updated after the next successful transaction.',
+                ),
+            ],
           ),
           actions: [
             TextButton(

@@ -13,7 +13,7 @@ class ConductorService {
     try {
       print('🔐 Attempting login for: $username');
 
-      // Use HttpApiService for Supabase authentication
+      // Authenticate against NauliTap API
       final result = await HttpApiService.loginConductor(username, password);
 
       if (result != null) {
@@ -30,8 +30,7 @@ class ConductorService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('conductor_id', _currentConductor!.id);
         await prefs.setString('username', username);
-        await prefs.setString(
-            'auth_token', 'supabase_token'); // In real app, store actual token
+        // NOTE: The real JWT is stored by HttpApiService as `auth_token`.
 
         print('✅ Login successful: ${_currentConductor!.fullName}');
         return true;
@@ -53,13 +52,13 @@ class ConductorService {
     if (conductorId != null && username != null) {
       // Try to validate with backend
       try {
-        // For demo, we'll just restore from local storage
-        // In production, validate token with backend
+        // Try to restore minimal info from local storage. For a stronger
+        // guarantee, you can re-validate the token against the API here.
         _currentConductor = Conductor(
           id: conductorId,
           username: username,
-          fullName: 'Samuel Kiproitch', // This should come from backend
-          vehicleAssigned: 'KBS 123A',
+          fullName: username,
+          vehicleAssigned: null,
           createdAt: DateTime.now(),
         );
         return true;

@@ -61,17 +61,22 @@ class TransactionService {
     }
   }
 
-  // New method for quick balance check
+  // New method for quick balance check.
+  // NOTE: This uses the Nauli Tap API's customer balance endpoint under the
+  // hood via [HttpApiService.checkCardBalance]. The JWT stored on the device
+  // must be authorised for that endpoint, otherwise an AUTH/FORBIDDEN error
+  // will be returned.
   static Future<Map<String, dynamic>> checkCardBalance(String cardUid) async {
     try {
-      return await HttpApiService.checkCardBalance(cardUid);
+      print('ℹ️ Checking balance for card $cardUid via HttpApiService...');
+      final result = await HttpApiService.checkCardBalance(cardUid);
+      return result;
     } catch (e) {
-      print('💥 Balance check error: $e');
-      return {
+      print('💥 checkCardBalance error in TransactionService: $e');
+      return <String, dynamic>{
         'success': false,
-        'balance': 0.0,
-        'isRegistered': false,
-        'error': 'Failed to check balance: ${e.toString()}',
+        'error': 'PROCESSING_ERROR',
+        'message': 'Failed to check card balance. Please try again.',
       };
     }
   }

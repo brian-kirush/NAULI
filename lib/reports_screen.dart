@@ -131,7 +131,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _reportType,
+                        initialValue: _reportType,
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),

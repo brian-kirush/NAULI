@@ -28,16 +28,6 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             
-            <!-- 🔥 ADD THIS: Supabase Deep Link for Authentication -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data 
-                    android:scheme="naulitap"
-                    android:host="login-callback" />
-            </intent-filter>
-            
             <!-- NFC intent filters -->
             <intent-filter>
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />

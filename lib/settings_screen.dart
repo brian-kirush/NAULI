@@ -247,7 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 }
               },
-              activeColor: Colors.blue,
+              activeThumbColor: Colors.blue,
             ),
             onTap: () {},
             isDarkMode: isDarkMode,
@@ -273,7 +273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 }
               },
-              activeColor: Colors.blue,
+              activeThumbColor: Colors.blue,
             ),
             onTap: () {},
             isDarkMode: isDarkMode,
@@ -321,7 +321,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 );
               },
-              activeColor: Colors.blue,
+              activeThumbColor: Colors.blue,
             ),
             onTap: () {},
             isDarkMode: isDarkMode,
