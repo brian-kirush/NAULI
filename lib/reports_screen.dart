@@ -13,15 +13,55 @@ class _ReportsScreenState extends State<ReportsScreen> {
   DateTime _endDate = DateTime.now();
   String _reportType = 'daily';
 
-  final Map<String, List<DailyReport>> _sampleReports = {};
+  List<DailyReport> _reports = [];
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _generateSampleData();
+    _loadReports();
   }
 
-  void _generateSampleData() {
+  Future<void> _loadReports() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _reports = [];
+    });
+
+    try {
+      final result = await HttpApiService.fetchConductorDailySummary(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      if (result['success'] == true) {
+        final List<dynamic> items = result['reports'] as List<dynamic>? ??
+            <dynamic>[];
+        final mapped = items.map((dynamic raw) {
+          final Map<String, dynamic> json =
+              raw as Map<String, dynamic>;
+          return DailyReport.fromJson(json);
+        }).toList();
+
+        setState(() {
+          _reports = mapped;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _error = result['message']?.toString() ??
+              'Failed to fetch reports.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
+  }
     final now = DateTime.now();
 
     _sampleReports['daily'] = [
@@ -83,7 +123,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   List<DailyReport> get _currentReports {
-    return _sampleReports[_reportType] ?? [];
+    return _reports;
   }
 
   @override
@@ -187,7 +227,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _generateReport,
+                    onPressed: _loadReports,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue[700],
                       shape: RoundedRectangleBorder(
@@ -233,26 +273,42 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
           // Reports List
           Expanded(
-            child: reports.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.assessment, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text(
-                          'No reports available',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.red),
+                          ),
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Generate a report to see analytics',
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
+                      )
+                    : reports.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.assessment,
+                                    size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text(
+                                  'No reports available',
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.grey),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Generate a report to see analytics',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: reports.length,
                     itemBuilder: (context, index) {
@@ -474,16 +530,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _startDate = picked.start;
         _endDate = picked.end;
       });
+      await _loadReports();
     }
-  }
-
-  void _generateReport() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$_reportType report generated for selected period'),
-        backgroundColor: Colors.green,
-      ),
-    );
   }
 
   void _shareReport() {

@@ -433,4 +433,190 @@ class HttpApiService {
       };
     }
   }
+
+  /// Fetches conductor transaction history from /report/conductor/transactions.
+  /// Returns the raw map from the API (success flag, transactions list, etc.).
+  static Future<Map<String, dynamic>> fetchConductorTransactions({
+    int page = 1,
+    int limit = 50,
+    DateTime? forDate,
+  }) async {
+    try {
+      final headers = await _authHeaders();
+      final query = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      if (forDate != null) {
+        final d = forDate;
+        final y = d.year.toString().padLeft(4, '0');
+        final m = d.month.toString().padLeft(2, '0');
+        final day = d.day.toString().padLeft(2, '0');
+        query['date'] = '$y-$m-$day';
+      }
+
+      final uri = Uri.parse('$_baseUrl/report/conductor/transactions')
+          .replace(queryParameters: query);
+      final response = await http.get(uri, headers: headers);
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body;
+      }
+
+      return <String, dynamic>{
+        'success': false,
+        'message': body['message']?.toString() ??
+            'Failed to fetch transactions. Please try again.',
+      };
+    } catch (e) {
+      // ignore: avoid_print
+      print('💥 fetchConductorTransactions error: $e');
+      return <String, dynamic>{
+        'success': false,
+        'message': 'Failed to fetch transactions. Please try again.',
+      };
+    }
+  }
+
+  /// Fetches conductor daily summary from /report/conductor/daily-summary.
+  static Future<Map<String, dynamic>> fetchConductorDailySummary({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      final headers = await _authHeaders();
+      final now = DateTime.now();
+      final start = startDate ?? now.subtract(const Duration(days: 7));
+      final end = endDate ?? now;
+
+      String fmt(DateTime d) {
+        final y = d.year.toString().padLeft(4, '0');
+        final m = d.month.toString().padLeft(2, '0');
+        final day = d.day.toString().padLeft(2, '0');
+        return '$y-$m-$day';
+      }
+
+      final uri = Uri.parse('$_baseUrl/report/conductor/daily-summary').replace(
+        queryParameters: <String, String>{
+          'start_date': fmt(start),
+          'end_date': fmt(end),
+        },
+      );
+
+      final response = await http.get(uri, headers: headers);
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body;
+      }
+
+      return <String, dynamic>{
+        'success': false,
+        'message': body['message']?.toString() ??
+            'Failed to fetch reports. Please try again.',
+      };
+    } catch (e) {
+      // ignore: avoid_print
+      print('💥 fetchConductorDailySummary error: $e');
+      return <String, dynamic>{
+        'success': false,
+        'message': 'Failed to fetch reports. Please try again.',
+      };
+    }
+  }
+
+  /// Fetches conductor settings from /user/conductor/settings.
+  static Future<Map<String, dynamic>> fetchConductorSettings() async {
+    try {
+      final headers = await _authHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/user/conductor/settings'),
+        headers: headers,
+      );
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body;
+      }
+
+      return <String, dynamic>{
+        'success': false,
+        'message': body['message']?.toString() ??
+            'Failed to fetch conductor settings.',
+      };
+    } catch (e) {
+      // ignore: avoid_print
+      print('💥 fetchConductorSettings error: $e');
+      return <String, dynamic>{
+        'success': false,
+        'message': 'Failed to fetch conductor settings.',
+      };
+    }
+  }
+
+  /// Updates conductor settings via /user/conductor/settings (PUT).
+  static Future<Map<String, dynamic>> updateConductorSettings(
+      Map<String, dynamic> settings) async {
+    try {
+      final headers = await _authHeaders();
+      final response = await http.put(
+        Uri.parse('$_baseUrl/user/conductor/settings'),
+        headers: headers,
+        body: jsonEncode(settings),
+      );
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body;
+      }
+
+      return <String, dynamic>{
+        'success': false,
+        'message': body['message']?.toString() ??
+            'Failed to update conductor settings.',
+      };
+    } catch (e) {
+      // ignore: avoid_print
+      print('💥 updateConductorSettings error: $e');
+      return <String, dynamic>{
+        'success': false,
+        'message': 'Failed to update conductor settings.',
+      };
+    }
+  }
+
+  /// Fetches conductor quick actions from /user/conductor/quick-actions.
+  static Future<Map<String, dynamic>> fetchConductorQuickActions() async {
+    try {
+      final headers = await _authHeaders();
+      final response = await http.get(
+        Uri.parse('$_baseUrl/user/conductor/quick-actions'),
+        headers: headers,
+      );
+      final Map<String, dynamic> body =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body;
+      }
+
+      return <String, dynamic>{
+        'success': false,
+        'message': body['message']?.toString() ??
+            'Failed to fetch quick actions.',
+      };
+    } catch (e) {
+      // ignore: avoid_print
+      print('💥 fetchConductorQuickActions error: $e');
+      return <String, dynamic>{
+        'success': false,
+        'message': 'Failed to fetch quick actions.',
+      };
+    }
+  }
 }

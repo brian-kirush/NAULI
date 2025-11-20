@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/transaction.dart'; // FIXED: Import the correct file
+import '../models/transaction.dart'; // Domain model for a single transaction
+import 'services/http_api_service.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -12,46 +13,68 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   final List<Transaction> _transactions = [];
   DateTime _selectedDate = DateTime.now();
   String _filterType = 'all';
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadSampleTransactions();
+    _loadTransactions();
   }
 
-  void _loadSampleTransactions() {
-    // Sample transaction data
+  Future<void> _loadTransactions() async {
     setState(() {
-      _transactions.addAll([
-        Transaction(
-          id: '1',
-          amount: 80.0,
-          route: 'RIT001 - Nairobi CBD - Westlands',
-          cardLastFour: '1234',
-          time: DateTime.now().subtract(const Duration(minutes: 5)),
-          type: 'fare',
-          platformFee: 2.0,
-        ),
-        Transaction(
-          id: '2',
-          amount: 80.0,
-          route: 'RIT001 - Nairobi CBD - Westlands',
-          cardLastFour: '5678',
-          time: DateTime.now().subtract(const Duration(minutes: 12)),
-          type: 'fare',
-          platformFee: 2.0,
-        ),
-        Transaction(
-          id: '3',
-          amount: 100.0,
-          route: 'RIT003 - CBD - Thika Road',
-          cardLastFour: '9012',
-          time: DateTime.now().subtract(const Duration(minutes: 25)),
-          type: 'fare',
-          platformFee: 2.0,
-        ),
-      ]);
+      _isLoading = true;
+      _error = null;
+      _transactions.clear();
     });
+
+    try {
+      final result = await HttpApiService.fetchConductorTransactions(
+        forDate: _selectedDate,
+      );
+      if (result['success'] == true) {
+        final List<dynamic> items = result['transactions'] as List<dynamic>? ??
+            <dynamic>[];
+        final mapped = items.map((dynamic raw) {
+          final Map<String, dynamic> json =
+              raw as Map<String, dynamic>;
+          final card = json['card'] as Map<String, dynamic>?;
+          final vehicle = json['vehicle'] as Map<String, dynamic>?;
+          final nfcLastFour = card?['last_four']?.toString() ?? '';
+          final licensePlate = vehicle?['license_plate']?.toString();
+
+          return Transaction(
+            id: json['id']?.toString() ?? '',
+            amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+            route: licensePlate != null && licensePlate.isNotEmpty
+                ? 'Vehicle $licensePlate'
+                : 'Route N/A',
+            cardLastFour: nfcLastFour,
+            time: DateTime.parse(json['transaction_date'].toString()),
+            type: json['type']?.toString() ?? 'fare',
+            platformFee:
+                (json['platform_fee'] as num?)?.toDouble() ?? 2.0,
+          );
+        }).toList();
+
+        setState(() {
+          _transactions.addAll(mapped);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _error = result['message']?.toString() ??
+              'Failed to fetch transactions.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
+    }
   }
 
   // FIXED: Added missing method
@@ -66,6 +89,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       setState(() {
         _selectedDate = picked;
       });
+      await _loadTransactions();
     }
   }
 
@@ -216,26 +240,46 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
           // Transactions List
           Expanded(
-            child: filteredTransactions.isEmpty
+            child: _isLoading
                 ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.receipt_long, size: 64, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text(
-                          'No transactions found',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Transactions will appear here after fare collections',
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                      ],
-                    ),
+                    child: CircularProgressIndicator(),
                   )
-                : ListView.builder(
+                : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
+                      )
+                    : filteredTransactions.isEmpty
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.receipt_long,
+                                    size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text(
+                                  'No transactions found',
+                                  style: TextStyle(
+                                      fontSize: 16, color: Colors.grey),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Transactions will appear here after fare collections',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: filteredTransactions.length,
                     itemBuilder: (context, index) {

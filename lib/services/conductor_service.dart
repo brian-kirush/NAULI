@@ -6,8 +6,19 @@ class ConductorService {
   static Conductor? _currentConductor;
   static bool _isOnline = true;
 
+  // Conductor settings (synced with backend where available)
+  static int _defaultFareAmount = 100;
+  static bool _notificationsEnabled = true;
+  static bool _autoSyncEnabled = false;
+  static bool _hapticFeedbackEnabled = true;
+
   static Conductor? get currentConductor => _currentConductor;
   static bool get isOnline => _isOnline;
+
+  static int get defaultFareAmount => _defaultFareAmount;
+  static bool get notificationsEnabled => _notificationsEnabled;
+  static bool get autoSyncEnabled => _autoSyncEnabled;
+  static bool get hapticFeedbackEnabled => _hapticFeedbackEnabled;
 
   static Future<bool> login(String username, String password) async {
     try {
@@ -33,6 +44,14 @@ class ConductorService {
         // NOTE: The real JWT is stored by HttpApiService as `auth_token`.
 
         print('✅ Login successful: ${_currentConductor!.fullName}');
+
+        // Best-effort load of settings; failures are non-fatal.
+        try {
+          await loadSettings();
+        } catch (e) {
+          print('⚠️ Failed to load conductor settings after login: $e');
+        }
+
         return true;
       }
 
@@ -95,5 +114,54 @@ class ConductorService {
 
   static void updateOnlineStatus(bool status) {
     _isOnline = status;
+  }
+
+  /// Pulls the latest conductor settings from the backend.
+  static Future<void> loadSettings() async {
+    final result = await HttpApiService.fetchConductorSettings();
+    if (result['success'] == true) {
+      final settings = result['settings'] as Map<String, dynamic>?;
+      if (settings != null) {
+        _defaultFareAmount = (settings['defaultFareAmount'] as num?)?.toInt() ?? 100;
+        _notificationsEnabled = settings['notificationsEnabled'] as bool? ?? true;
+        _autoSyncEnabled = settings['autoSyncEnabled'] as bool? ?? false;
+        _hapticFeedbackEnabled = settings['hapticFeedbackEnabled'] as bool? ?? true;
+      }
+    }
+  }
+
+  /// Persists updated settings to the backend and updates the local cache.
+  static Future<bool> updateSettings({
+    int? defaultFareAmount,
+    bool? notificationsEnabled,
+    bool? autoSyncEnabled,
+    bool? hapticFeedbackEnabled,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (defaultFareAmount != null) {
+      payload['defaultFareAmount'] = defaultFareAmount;
+    }
+    if (notificationsEnabled != null) {
+      payload['notificationsEnabled'] = notificationsEnabled;
+    }
+    if (autoSyncEnabled != null) {
+      payload['autoSyncEnabled'] = autoSyncEnabled;
+    }
+    if (hapticFeedbackEnabled != null) {
+      payload['hapticFeedbackEnabled'] = hapticFeedbackEnabled;
+    }
+
+    if (payload.isEmpty) return true;
+
+    final result = await HttpApiService.updateConductorSettings(payload);
+    if (result['success'] == true) {
+      // Merge into local cache
+      if (defaultFareAmount != null) _defaultFareAmount = defaultFareAmount;
+      if (notificationsEnabled != null) _notificationsEnabled = notificationsEnabled;
+      if (autoSyncEnabled != null) _autoSyncEnabled = autoSyncEnabled;
+      if (hapticFeedbackEnabled != null) _hapticFeedbackEnabled = hapticFeedbackEnabled;
+      return true;
+    }
+    return false;
   }
 }

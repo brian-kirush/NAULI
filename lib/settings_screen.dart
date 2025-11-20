@@ -9,9 +9,25 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _autoSyncEnabled = false;
-  bool _hapticFeedbackEnabled = true;
+  bool _notificationsEnabled = ConductorService.notificationsEnabled;
+  bool _autoSyncEnabled = ConductorService.autoSyncEnabled;
+  bool _hapticFeedbackEnabled = ConductorService.hapticFeedbackEnabled;
+  late final TextEditingController _fareController;
+  bool _isSavingFare = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fareController = TextEditingController(
+      text: ConductorService.defaultFareAmount.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fareController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: SizedBox(
               width: 100,
               child: TextFormField(
-                initialValue: '100',
+                controller: _fareController,
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.right,
                 style: TextStyle(
@@ -165,6 +181,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 decoration: InputDecoration(
                   hintText: 'Amount',
+                  suffixIcon: _isSavingFare
+                      ? const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        )
+                      : null,
                   hintStyle: TextStyle(
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                   ),
@@ -174,8 +202,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                   ),
                 ),
-                onChanged: (value) {
-                  // Handle fare amount change
+                onFieldSubmitted: (value) async {
+                  final parsed = int.tryParse(value);
+                  if (parsed == null || parsed <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Please enter a valid fare amount greater than 0.'),
+                      ),
+                    );
+                    _fareController.text =
+                        ConductorService.defaultFareAmount.toString();
+                    return;
+                  }
+
+                  setState(() {
+                    _isSavingFare = true;
+                  });
+                  final ok = await ConductorService.updateSettings(
+                    defaultFareAmount: parsed,
+                  );
+                  setState(() {
+                    _isSavingFare = false;
+                  });
+
+                  if (ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'Default fare updated to Ksh $parsed for this conductor.'),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Failed to update default fare. Please try again.'),
+                      ),
+                    );
+                    _fareController.text =
+                        ConductorService.defaultFareAmount.toString();
+                  }
                 },
               ),
             ),
@@ -233,10 +300,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Receive notifications from admin',
             trailing: Switch(
               value: _notificationsEnabled,
-              onChanged: (value) {
+              onChanged: (value) async {
                 setState(() {
                   _notificationsEnabled = value;
                 });
+                final ok = await ConductorService.updateSettings(
+                  notificationsEnabled: value,
+                );
+                if (!ok) {
+                  // Roll back on failure
+                  setState(() {
+                    _notificationsEnabled = !value;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Failed to update notification preference.'),
+                    ),
+                  );
+                  return;
+                }
+
                 if (value) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -259,10 +343,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Automatically sync data when online',
             trailing: Switch(
               value: _autoSyncEnabled,
-              onChanged: (value) {
+              onChanged: (value) async {
                 setState(() {
                   _autoSyncEnabled = value;
                 });
+                final ok = await ConductorService.updateSettings(
+                  autoSyncEnabled: value,
+                );
+                if (!ok) {
+                  setState(() {
+                    _autoSyncEnabled = !value;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Failed to update auto-sync preference.'),
+                    ),
+                  );
+                  return;
+                }
+
                 if (value) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -308,10 +408,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Enable vibration feedback for actions',
             trailing: Switch(
               value: _hapticFeedbackEnabled,
-              onChanged: (value) {
+              onChanged: (value) async {
                 setState(() {
                   _hapticFeedbackEnabled = value;
                 });
+                final ok = await ConductorService.updateSettings(
+                  hapticFeedbackEnabled: value,
+                );
+                if (!ok) {
+                  setState(() {
+                    _hapticFeedbackEnabled = !value;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Failed to update haptic feedback preference.'),
+                    ),
+                  );
+                  return;
+                }
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(value
